@@ -32,7 +32,9 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="@string/google_maps_key" />
-
+        <service
+            android:exported="false"
+            android:name="com.novoda.merlin.MerlinService" />
         <activity
             android:name=".MapsActivity"
             android:label="@string/title_activity_maps">
@@ -42,6 +44,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
     </application>
 
 </manifest>

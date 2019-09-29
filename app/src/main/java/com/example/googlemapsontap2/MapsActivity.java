@@ -85,6 +85,11 @@ import com.google.android.libraries.places.api.net.PlacesClient;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.mancj.materialsearchbar.MaterialSearchBar;
 import com.mancj.materialsearchbar.adapter.SuggestionsAdapter;
+import com.novoda.merlin.Bindable;
+import com.novoda.merlin.Connectable;
+import com.novoda.merlin.Disconnectable;
+import com.novoda.merlin.Merlin;
+import com.novoda.merlin.NetworkStatus;
 
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Array;
@@ -94,27 +99,29 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, SearchDirectionListener {
+
     private  Location location;
     private GoogleMap mMap;
     CardView layoutBottomSheet;
     BottomSheetBehavior sheetBehavior;
-    private LocationListener locationListener;
 
     private TextView tvDiaChi;
     private Button btnChiDuong;
 
-        private FusedLocationProviderClient mfusedLocationProviderClient;
-        private PlacesClient mplacesClient;
-        private List<AutocompletePrediction> predictionList;
-        private LocationCallback locationCallback;
-        private MaterialSearchBar materialSearchBar;
-        private View mapView;
+    private FusedLocationProviderClient mfusedLocationProviderClient;
+    private PlacesClient mplacesClient;
+    private List<AutocompletePrediction> predictionList;
+    private LocationCallback locationCallback;
+    private MaterialSearchBar materialSearchBar;
+    private View mapView;
 
 
     private List<Marker> originMarkers = new ArrayList<>();
     private List<Marker> destinationMarkers = new ArrayList<>();
     private List<Polyline> polylinePaths = new ArrayList<>();
     private ProgressDialog progressDialog;
+
+    private Merlin merlin;
 
     String sss ;
 
@@ -126,13 +133,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         AnhXa();
         getDeviceLocation();
 
-    }
 
+
+
+    }
     private void AnhXa() {
         tvDiaChi = (TextView) findViewById(R.id.tvDiaChi);
         btnChiDuong = (Button) findViewById(R.id.btnChiDuong);
         layoutBottomSheet = findViewById(R.id.bottom_sheet);
         materialSearchBar = findViewById(R.id.searchBar);
+        merlin = new Merlin.Builder().withConnectableCallbacks().build(this);
 
 
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
@@ -165,9 +175,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             @Override
             public void onButtonClicked(int buttonCode) {
 
-
                 if (buttonCode == MaterialSearchBar.BUTTON_NAVIGATION){
-                    // mo navigation len
+                    // mo NAVIGATION
+
                 }else if (buttonCode == MaterialSearchBar.BUTTON_BACK){
                     materialSearchBar.disableSearch();
                     sheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
@@ -222,7 +232,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     }
                 });
             }
-
             @Override
             public void afterTextChanged(Editable editable) {
 
@@ -235,6 +244,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 if (position >= predictionList.size()){
                     return;
                 }
+
                 AutocompletePrediction selectedPrediction = predictionList.get(position);
                 final String suggestion = materialSearchBar.getLastSuggestions().get(position).toString();
                 materialSearchBar.setText(suggestion);
@@ -259,21 +269,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         @Override
                         public void onSuccess(FetchPlaceResponse fetchPlaceResponse) {
                             final Place place = fetchPlaceResponse.getPlace();
-
                             btnChiDuong.setOnClickListener(new View.OnClickListener() {
                                 @Override
                                 public void onClick(View view) {
                                     if (location == null){
                                         Toast.makeText(MapsActivity.this, "Chưa xác định được vị trí hiện tại", Toast.LENGTH_SHORT).show();
                                     }else {
-                                        String latlngdau = place.getLatLng().latitude + "," + place.getLatLng().longitude;
+                                        final  String latlngdau = place.getLatLng().latitude + "," + place.getLatLng().longitude;
                                         try {
                                             new SearchDirection(MapsActivity.this, sss, latlngdau).execute();
                                             sheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
                                         } catch (UnsupportedEncodingException e) {
                                             e.printStackTrace();
                                         }
-
                                     }
                                 }
                             });
@@ -289,7 +297,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                 ApiException apiException = (ApiException) e;
                                 apiException.printStackTrace();
                                 int statusCode = apiException.getStatusCode();
-                                // gặp lỗi
+                                //  lỗi
                             }
                         }
                     });
@@ -363,6 +371,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     }
                 }
             });
+
     }
 
     // hàm trả về kết quả
@@ -416,11 +425,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     public void onDirectionFinderStart() {
-        progressDialog = new ProgressDialog(this);
-        progressDialog.setMessage("Dowloading...");
-        progressDialog.cancel();
-        progressDialog.show();
-
+       progressDialog = new ProgressDialog(MapsActivity.this);
+       progressDialog.setMessage("Dowloading...");
+       progressDialog.cancel();
+       progressDialog.show();
 
         if (originMarkers != null) {
             for (Marker marker : originMarkers) {
@@ -439,22 +447,39 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 polyline.remove();
             }
         }
+
     }
 
+
     @Override
-    public void onDirectionFinderSuccess(List<MapRoute> mapRoute) {
+    public void onDirectionFinderSuccess(final List<MapRoute> mapRoute) {
+        PolyLine(mapRoute);
+
+        merlin.registerConnectable(new Connectable() {
+            @Override
+            public void onConnect() {
+                PolyLine(mapRoute);
+            }
+        });
+
+        }
+
+//    private BitmapDescriptor bitmapDescriptorFromVector(Context context, int vectorResId) {
+//        Drawable vectorDrawable = ContextCompat.getDrawable(context, vectorResId);
+//        vectorDrawable.setBounds(0, 0, vectorDrawable.getIntrinsicWidth(), vectorDrawable.getIntrinsicHeight());
+//        Bitmap bitmap = Bitmap.createBitmap(vectorDrawable.getIntrinsicWidth(), vectorDrawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
+//        Canvas canvas = new Canvas(bitmap);
+//        vectorDrawable.draw(canvas);
+//        return BitmapDescriptorFactory.fromBitmap(bitmap);
+//    }
+    private void PolyLine(List<MapRoute> mapRoute){
+
         progressDialog.dismiss();
-        polylinePaths = new ArrayList<>();
-        originMarkers = new ArrayList<>();
-        destinationMarkers = new ArrayList<>();
-
-        for (MapRoute mapRoute1: mapRoute) {
+        for (MapRoute mapRoute1 : mapRoute) {
             mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(mapRoute1.startLocation, 12));
-
             tvDiaChi.setText(mapRoute1.endAddress
-                    +"\n" + "Thời gian : " + mapRoute1.mapDuration.txtDuration
-                    +"\n" + "Quãng đường :"+mapRoute1.mapDistance.txtDistance);
-
+                    + "\n" + "Thời gian : " + mapRoute1.mapDuration.txtDuration
+                    + "\n" + "Quãng đường :" + mapRoute1.mapDistance.txtDistance);
 
             originMarkers.add(mMap.addMarker(new MarkerOptions()
                     .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED))
@@ -477,13 +502,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
-//    private BitmapDescriptor bitmapDescriptorFromVector(Context context, int vectorResId) {
-//        Drawable vectorDrawable = ContextCompat.getDrawable(context, vectorResId);
-//        vectorDrawable.setBounds(0, 0, vectorDrawable.getIntrinsicWidth(), vectorDrawable.getIntrinsicHeight());
-//        Bitmap bitmap = Bitmap.createBitmap(vectorDrawable.getIntrinsicWidth(), vectorDrawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
-//        Canvas canvas = new Canvas(bitmap);
-//        vectorDrawable.draw(canvas);
-//        return BitmapDescriptorFactory.fromBitmap(bitmap);
-//    }
+    @Override
+    protected void onResume() {
+    super.onResume();
+    merlin.bind(); }
+
+    @Override
+    protected void onPause() {
+        merlin.unbind();
+        super.onPause();
+    }
 
 }
